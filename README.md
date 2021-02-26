@@ -2,6 +2,8 @@
 
 Automatic Goldeneye degen stats. A lot of stuff should be fixed and improved, but it seems good enough for now. I've done >2000 attempts on Bunker 1 with it. Here is one hour of me using it: [YouTube](https://www.youtube.com/watch?v=kUyHAwphZ1c).
 
+![Screenshot](https://lambdan.se/img/2021-02-26_23-49-19.229.png)
+
 ## Features
 
 - Automatically counts attempts and time spent
