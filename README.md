@@ -11,7 +11,7 @@ Automatic Goldeneye degen stats. A lot of stuff should be fixed and improved, bu
 
 ## Installation
 
-Prereqs: `pip3 install mss numpy opencv-python pynput`
+Prereqs: `pip3 install mss=10.0.0 numpy==2.2.6 opencv-python==4.12.0.88 pynput==1.8.1`
 
 Then just download the repo (including the `screens/` folder) and run `Boris.py` with Python 3.
 
