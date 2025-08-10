@@ -44,8 +44,9 @@ PAUSED_DURATION = 0
 STATUS_MESSAGE = "HELLO!"
 
 # font stuff
-FONT = cv2.FONT_HERSHEY_DUPLEX
+FONT = cv2.FONT_HERSHEY_SIMPLEX
 FONT_SCALE = 1
+FONT_THIN = 1
 FONT_THICK = 2
 COLOR_PAUSED = (255,255,0) # cyan
 COLOR_RUNNING = (0,252,124) # bright green
@@ -182,8 +183,8 @@ def caseInsensitiveLevel(levelName: str) -> str:
             return l
     return levelName
 
-def makeNote(level: str, note: str):
-    DATA["levels"][level]["notes"].append({
+def makeMilestone(level: str, note: str):
+    DATA["levels"][level]["milestones"].append({
         "time": datetime.datetime.now().isoformat(),
         "attempts": getTotalAttempts(level),
         "duration": getTotalDuration(level),
@@ -219,15 +220,21 @@ def setLevel():
         DATA["levels"][CURRENT_LEVEL] = {
             "attempts": 0,
             "duration": 0,
-            "last_played": None
+            "last_played": None,
+            "milestones": [],
+            "note": ""
         }
     DATA["last_played"] = CURRENT_LEVEL
 
 
 def runSessionLoop():
     global RUNNING, IS_PAUSED, PAUSED_DURATION, PAUSE_STARTED, STATUS_MESSAGE, CURRENT_LEVEL, HISTORY
-
+    RUNNING = True
     while RUNNING:
+        status_view = numpy.zeros((500,500,3), numpy.uint8)
+        # for some reason, if this isnt here, the window is huge:
+        game_capture = screenshotRegion(pfTop, pfLeft, pfWidth, pfHeight)
+        
         ### input handling
         k = cv2.waitKey( int(WAIT_DELAY) ) # requires int
         if k == ord("q"): # press q to quit
@@ -244,15 +251,20 @@ def runSessionLoop():
             DATA["last_played"] = None
             RUNNING = False # break the loop
             break
+        elif k == ord("m"):
+            makeMilestone(CURRENT_LEVEL, input("Enter milestone note: "))
         elif k == ord("n"):
-            makeNote(CURRENT_LEVEL, input("Enter note: "))
+            DATA["levels"][CURRENT_LEVEL]["note"] = input("Enter note: ")
+            save()
 
-        status_view = numpy.zeros((500,500,3), numpy.uint8)
+
+        # level name and note
+        cv2.putText(status_view, CURRENT_LEVEL, (10,40), FONT, FONT_SCALE, COLOR_RUNNING, FONT_THICK, cv2.LINE_AA)
+        cv2.putText(status_view, DATA["levels"][CURRENT_LEVEL]["note"], (10,70), FONT, FONT_SCALE * 0.6, COLOR_REGULAR, FONT_THIN, cv2.LINE_AA)
         
         if not IS_PAUSED:
-            game_capture = screenshotRegion(pfTop, pfLeft, pfWidth, pfHeight)
             game_comp = cv2.resize( cv2.cvtColor(game_capture, cv2.COLOR_BGR2GRAY ), DOWNSCALE_RES )
-            cv2.imshow("capture region", game_comp) 
+            #cv2.imshow("capture region", game_comp) 
 
             mostLikely = (0, "?")
 
@@ -282,30 +294,34 @@ def runSessionLoop():
 
         timerColor = COLOR_PAUSED if IS_PAUSED else COLOR_RUNNING
 
-        # title
-        cv2.putText(status_view, CURRENT_LEVEL, (10,30), FONT, FONT_SCALE, (255,255,255), FONT_THICK, cv2.LINE_AA)
 
-        if IS_PAUSED:
-            cv2.putText(status_view, "PAUSED", (10,310), FONT, FONT_SCALE * 1.5, COLOR_PAUSED, FONT_THICK, cv2.LINE_AA)
+        # this session
+        Y_OFFSET = 120
+        cv2.putText(status_view, "This session", (10,Y_OFFSET + 0), FONT, 1, COLOR_REGULAR, FONT_THICK, cv2.LINE_AA)
+        cv2.putText(status_view, str(SESSION["attempts"]) + " attempts", (10,Y_OFFSET + 30), FONT, 0.8, COLOR_REGULAR, 1, cv2.LINE_AA)
+        cv2.putText(status_view, formatDuration(getSessionDuration()), (10,Y_OFFSET + 60), FONT, 0.8, timerColor, 1, cv2.LINE_AA)
 
-        cv2.putText(status_view, "Session", (10,90), FONT, 1, (0,255,255), FONT_THICK, cv2.LINE_AA)
-        cv2.putText(status_view, "Attempts: " + str(SESSION["attempts"]), (10,120), FONT, 0.8, COLOR_REGULAR, 1, cv2.LINE_AA)
-        cv2.putText(status_view, formatDuration(getSessionDuration()), (10,150), FONT, 0.8, timerColor, 1, cv2.LINE_AA)
+        # total
+        Y_OFFSET = 230
+        cv2.putText(status_view, "Level total", (10,Y_OFFSET + 0), FONT, 1, COLOR_REGULAR, FONT_THICK, cv2.LINE_AA)
+        cv2.putText(status_view, str(getTotalAttempts(CURRENT_LEVEL)) + " attempts", (10,Y_OFFSET + 30), FONT, 0.8, COLOR_REGULAR, 1, cv2.LINE_AA)
+        cv2.putText(status_view, formatDuration(getTotalDuration(CURRENT_LEVEL)), (10,Y_OFFSET + 60), FONT, 0.8, timerColor, 1, cv2.LINE_AA)
 
-        cv2.putText(status_view, "Total", (10,200), FONT, 1, (0,128,255), FONT_THICK, cv2.LINE_AA)
-        cv2.putText(status_view, "Attempts: " + str(getTotalAttempts(CURRENT_LEVEL)), (10,230), FONT, 0.8, COLOR_REGULAR, 1, cv2.LINE_AA)
-        cv2.putText(status_view, formatDuration(getTotalDuration(CURRENT_LEVEL)), (10,260), FONT, 0.8, timerColor, 1, cv2.LINE_AA)
-
-        cv2.putText(status_view, "------------- crop here ------------", (10,350), FONT, 0.4, (255,255,255), 1, cv2.LINE_AA)
-        cv2.putText(status_view, ",".join(reversed(HISTORY)), (10,380), FONT, 0.4, (255,255,255), 1, cv2.LINE_AA)
-        
+        # controls
         pausetext = "P: Pause" if not IS_PAUSED else "P: UnPause"
-        cv2.putText(status_view, pausetext + ", S: Save, L: Set Level, N: Note/Milestone", (10,400), FONT, 0.4, (255,255,255), 1, cv2.LINE_AA)
+        cv2.putText(status_view, pausetext + ", S: Save, L: ChangeLevel, M: Milestone, N: EditNote", (10,400), FONT, 0.4, COLOR_REGULAR, 1, cv2.LINE_AA)
+        cv2.putText(status_view, "Q: Quit, G: CaptureRegion", (10,420), FONT, 0.4, COLOR_REGULAR, 1, cv2.LINE_AA)
         
-        cv2.putText(status_view, "Q: Quit, G: CaptureRegion", (10,420), FONT, 0.4, (255,255,255), 1, cv2.LINE_AA)
-        cv2.putText(status_view, "Last save: " + str(LAST_SAVE or "Never"), (10,440), FONT, 0.4, (255,255,255), 1, cv2.LINE_AA)
+        if IS_PAUSED:
+            cv2.putText(status_view, "PAUSED", (250,200), FONT, FONT_SCALE * 1.5, COLOR_PAUSED, FONT_THICK, cv2.LINE_AA)
+
+        # debug
+        cv2.putText(status_view, "Last save: " + str(LAST_SAVE or "Never"), (10,440), FONT, 0.4, COLOR_REGULAR, 1, cv2.LINE_AA)
+        cv2.putText(status_view, ",".join(reversed(HISTORY)), (10,380), FONT, 0.4, COLOR_REGULAR, 1, cv2.LINE_AA)
 
         cv2.imshow("Boris", status_view)
+
+
 
 
 while True:
@@ -315,10 +331,11 @@ while True:
     if CURRENT_LEVEL is None:
         setLevel()
 
-    RUNNING = True
     IS_PAUSED = False
     togglePause()
 
     SESSION["started"] = time.time()
+    SESSION["attempts"] = 0
+    SESSION["attemptsAtStart"] = DATA["levels"][CURRENT_LEVEL]["attempts"]
     SESSION["durationAtStart"] = DATA["levels"][CURRENT_LEVEL]["duration"]
     runSessionLoop()
