@@ -291,6 +291,7 @@ def runSessionLoop():
             if HISTORY[-1] == "Black" and HISTORY[-2] == "OHMSS":
                 # OHMSS -> Black == New attempt (or console shutdown)
                 SESSION["attempts"] += 1
+                save() # autosave
 
         timerColor = COLOR_PAUSED if IS_PAUSED else COLOR_RUNNING
 
